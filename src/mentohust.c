@@ -12,13 +12,14 @@
 #else
 #define HAVE_ICONV_H
 #endif
-#include "gettext.h"
+
 #include "myconfig.h"
 #include "mystate.h"
 #include "myfunc.h"
 #include "dlfunc.h"
 #include <signal.h>
 #include <string.h>
+#include <stdlib.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
@@ -49,9 +50,6 @@ static void showCernetMsg(const u_char *buf);	/* 显示赛尔服务器提示信�
 
 int main(int argc, char **argv)
 {
-	setlocale(LC_ALL, "");
-	textdomain(GETTEXT_PACKAGE);
-
 	atexit(exit_handle);
 	initConfig(argc, argv);
 	signal(SIGALRM, sig_handle);	/* 定时器 */
@@ -65,13 +63,10 @@ int main(int argc, char **argv)
 	else
 		switchState(ID_START);	/* 开始认证 */
 	if (-1 == pcap_loop(hPcap, -1, pcap_handle, NULL)) { /* 开始捕获数据包 */
-		//"!! Errcapturing packet, please check your network connections\n")); 
 		printf("!! 捕获数据包失败，请检查网络连接！\n");
 #ifndef NO_NOTIFY
 		if (showNotify)
-			show_notify( _("MentoHUST - error propt"),
-			 _("Failed to capture packages, please check your network connections!")); //"捕获数据包失败，请检查网络连接！");
-			
+			show_notify("MentoHUST - 错误提示", "捕获数据包失败，请检查网络连接！");
 #endif
 	}
 	exit(EXIT_FAILURE);
@@ -93,7 +88,7 @@ static void exit_handle(void)
 #ifndef NO_DYLOAD
 	free_libpcap();
 #endif
-	printf(_(">> Auth exit.\n"));
+	printf(">> 认证已退出。\n");
 }
 
 static void sig_handle(int sig)
@@ -178,17 +173,22 @@ static void pcap_handle(u_char *user, const struct pcap_pkthdr *h, const u_char 
 #ifndef NO_ARP
 	} else if (gateMAC[0]!=0xFE && buf[0x0c]==0x08 && buf[0x0d]==0x06) {
 		if (*(u_int32_t *)(buf+0x1c) == gateway) {
+			char str[50];
 			if (gateMAC[0] == 0xFF) {
 				memcpy(gateMAC, buf+0x16, 6);
 				printf("** 网关MAC:\t%s\n", formatHex(gateMAC, 6));
 				fflush(stdout);
+				sprintf(str, "arp -s %s %s", formatIP(gateway), formatHex(gateMAC, 6));
+				system(str);
 			} else if (buf[0x15]==0x02 && *(u_int32_t *)(buf+0x26)==rip
 				&& memcmp(gateMAC, buf+0x16, 6)!=0) {
 				printf("** ARP欺骗:\t%s\n", formatHex(buf+0x16, 6));
 				fflush(stdout);
 #ifndef NO_NOTIFY
-			if (showNotify)
-				show_notify("MentoHUST - ARP提示", formatHex(buf+0x16, 6));
+				if (showNotify) {
+					sprintf(str, "欺骗源: %s", formatHex(buf+0x16, 6));
+					show_notify("MentoHUST - ARP提示", str);
+				}
 #endif
 			}
 		}

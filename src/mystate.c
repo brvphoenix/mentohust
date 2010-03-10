@@ -11,6 +11,7 @@
 #include "myfunc.h"
 #include "dlfunc.h"
 #include <string.h>
+#include <stdlib.h>
 #include <netinet/in.h>
 
 #define MAX_SEND_COUNT		3	/* 最大超时次数 */
